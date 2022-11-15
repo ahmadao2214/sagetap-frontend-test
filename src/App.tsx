@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, {
+  Dispatch, SetStateAction, useEffect, useState,
+} from 'react';
 import './App.css';
 
 async function getArtwork(id: number) {
@@ -8,14 +10,20 @@ async function getArtwork(id: number) {
 function getImageUrl(id: string) {
   return `https://www.artic.edu/iiif/2/${id}/full/843,/0/default.jpg`;
 }
-interface ArtItemProps {
+// TODO: Review if this type is needed
+export interface ArtItemInterface {
   id: number,
-  disabled: boolean
+  disabled: boolean,
 }
 
-function ArtItem(props: ArtItemProps): JSX.Element {
-  const { id, disabled } = props;
+export interface ArtItemComponent extends ArtItemInterface {
+  setArtItems: Dispatch<SetStateAction<ArtItemInterface[]>>
+}
+
+function ArtItem(props: ArtItemComponent): JSX.Element {
+  const { id, disabled, setArtItems } = props;
   const [voted, setVoted] = useState<boolean>(false);
+  const [rating, setRating] = useState<number>();
   const [artwork, setArtwork] = useState<any>(null);
 
   const submit = () => {
@@ -43,8 +51,7 @@ function ArtItem(props: ArtItemProps): JSX.Element {
     return <>DISABLED</>;
   }
 
-  console.log(voted);
-
+  // TODO: Update with React Query
   useEffect(() => {
     getArtwork(id)
       .then((r) => r.json())
@@ -63,11 +70,11 @@ function ArtItem(props: ArtItemProps): JSX.Element {
       <p>
         Rating:
         {' '}
-        {artwork && artwork.rating}
+        {rating ?? ''}
       </p>
       <button
         onClick={() => {
-          artwork.rating = 1;
+          setRating(1);
           setVoted(true);
         }}
         type="button"
@@ -76,7 +83,7 @@ function ArtItem(props: ArtItemProps): JSX.Element {
       </button>
       <button
         onClick={() => {
-          artwork.rating = 2;
+          setRating(2);
           setVoted(true);
         }}
         type="button"
@@ -85,7 +92,7 @@ function ArtItem(props: ArtItemProps): JSX.Element {
       </button>
       <button
         onClick={() => {
-          artwork.rating = 3;
+          setRating(3);
           setVoted(true);
         }}
         type="button"
@@ -94,7 +101,7 @@ function ArtItem(props: ArtItemProps): JSX.Element {
       </button>
       <button
         onClick={() => {
-          artwork.rating = 4;
+          setRating(4);
           setVoted(true);
         }}
         type="button"
@@ -103,7 +110,7 @@ function ArtItem(props: ArtItemProps): JSX.Element {
       </button>
       <button
         onClick={() => {
-          artwork.rating = 5;
+          setRating(5);
           setVoted(true);
         }}
         type="button"
@@ -113,14 +120,23 @@ function ArtItem(props: ArtItemProps): JSX.Element {
       <button disabled={!voted} onClick={submit()} type="submit">
         Submit
       </button>
+      <button
+        type="button"
+        onClick={() => setArtItems(
+          (artItems: ArtItemInterface[]) => artItems.filter(
+            (art: ArtItemInterface) => art.id !== id,
+          ),
+        )}
+      >
+        Remove Art
+
+      </button>
     </div>
   );
 }
 
 function App() {
-  const [arts, setArts] = useState<JSX.Element[]>([]);
-
-  const artIdList: ArtItemProps[] = [
+  const artItemList: ArtItemInterface[] = [
     { id: 27992, disabled: false },
     { id: 27998, disabled: false },
     { id: 27999, disabled: false },
@@ -128,17 +144,21 @@ function App() {
     { id: 27993, disabled: false },
   ];
 
-  useEffect(() => {
-    const artItems = artIdList.map((artId) => (
-      <ArtItem id={artId.id} disabled={artId.disabled} />
-    ));
-    setArts(artItems);
-  }, [setArts]);
+  const [artItems, setArtItems] = useState<ArtItemInterface[]>(artItemList);
 
   return (
     <div className="App">
       <h1>Art Rater</h1>
-      {arts}
+      {artItems.map(
+        (artItem) => (
+          <ArtItem
+            key={artItem.id}
+            id={artItem.id}
+            disabled={artItem.disabled}
+            setArtItems={setArtItems}
+          />
+        ),
+      )}
     </div>
   );
 }

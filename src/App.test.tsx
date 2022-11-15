@@ -1,9 +1,9 @@
-import { render, screen , fireEvent } from '@testing-library/react';
+import React, { render, screen, fireEvent } from '@testing-library/react';
 import { App, ArtItem } from './App';
 
 test('has title', () => {
   render(<App />);
-  const title = screen.getByText("Art Rater");
+  const title = screen.getByText('Art Rater');
   expect(title).toBeInTheDocument();
 });
 

@@ -1,33 +1,57 @@
 import React, {
-  Dispatch, SetStateAction, useEffect, useState,
+  Dispatch, SetStateAction, useState,
 } from 'react';
+import {
+  useQuery,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
 import './App.css';
 
-async function getArtwork(id: number) {
-  return fetch(`https://api.artic.edu/api/v1/artworks/${id}`);
-}
+const queryClient = new QueryClient();
+
+const getArtwork = async (id: number) => {
+  const response = await fetch(`https://api.artic.edu/api/v1/artworks/${id}`);
+  if (!response.ok) {
+    throw new Error('Network response was not ok');
+  }
+  return response.json();
+};
 
 function getImageUrl(id: string) {
   return `https://www.artic.edu/iiif/2/${id}/full/843,/0/default.jpg`;
 }
-// TODO: Review if this type is needed
+
+function postArtworkRating(ratedArtItem: RatedArtItemInterface) {
+  fetch('https://20e2q.mocklab.io/rating', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(ratedArtItem),
+  }).then((response) => response.json())
+    .then((data) => console.log('SUCCESS:', data))
+    .catch(console.error);
+}
 export interface ArtItemInterface {
   id: number,
-  disabled: boolean,
+}
+export interface RatedArtItemInterface extends ArtItemInterface {
+  id: number,
+  rating: number;
 }
 
 export interface ArtItemComponent extends ArtItemInterface {
   setArtItems: Dispatch<SetStateAction<ArtItemInterface[]>>
 }
 
-function ArtItem(props: ArtItemComponent): JSX.Element {
-  const { id, disabled, setArtItems } = props;
+function ArtItem({ id, setArtItems }: ArtItemComponent): JSX.Element {
   const [voted, setVoted] = useState<boolean>(false);
   const [rating, setRating] = useState<number>();
-  const [artwork, setArtwork] = useState<any>(null);
+  const { data } = useQuery(['art', id], () => getArtwork(id));
+  const artWorkData = data?.data;
 
-  const submit = () => {
-    console.log('Submitting!');
+  const submit = (submittedRating: number) => {
     /*
     Please have the submit button POST to https://20e2q.mocklab.io/rating with the following payload:
 
@@ -44,28 +68,17 @@ function ArtItem(props: ArtItemComponent): JSX.Element {
       "message": "Success"
     }
   */
-    return () => {};
+    postArtworkRating({ id, rating: submittedRating });
   };
-
-  if (disabled) {
-    return <>DISABLED</>;
-  }
-
-  // TODO: Update with React Query
-  useEffect(() => {
-    getArtwork(id)
-      .then((r) => r.json())
-      .then((json) => setArtwork(json));
-  }, []);
 
   return (
     <div className="item">
-      <h2>{artwork && artwork.data.title}</h2>
-      <h3>{artwork && artwork.data.artist_title}</h3>
+      <h2>{artWorkData?.title}</h2>
+      <h3>{artWorkData?.artist_title}</h3>
       <img
         style={{ width: 100 }}
         alt=""
-        src={artwork != null ? getImageUrl(artwork.data.image_id) : ''}
+        src={getImageUrl(artWorkData?.image_id) ?? ''}
       />
       <p>
         Rating:
@@ -117,7 +130,7 @@ function ArtItem(props: ArtItemComponent): JSX.Element {
       >
         5
       </button>
-      <button disabled={!voted} onClick={submit()} type="submit">
+      <button disabled={!voted} onClick={() => submit(rating as number)} type="submit">
         Submit
       </button>
       <button
@@ -135,31 +148,52 @@ function ArtItem(props: ArtItemComponent): JSX.Element {
   );
 }
 
-function App() {
+// Complete List:
+// https://raw.githubusercontent.com/art-institute-of-chicago/api-data/master/getting-started/allArtworks.jsonl
+function AddArtItem({ setArtItems }: {
+  setArtItems : Dispatch<SetStateAction<ArtItemInterface[]>>
+}): JSX.Element {
+  const [id, setId] = useState('');
+  const newArtItem: ArtItemInterface = { id: Number(id) };
+
+  // TODO: Error States - number input, id exists, timeout
+  return (
+    <div>
+      <input type="text" value={id} onChange={(e) => setId(e.target.value)} />
+      <button type="button" onClick={() => setArtItems((artItems: ArtItemInterface[]) => [...artItems, newArtItem])}>
+        Add Art
+      </button>
+    </div>
+  );
+}
+
+function App(): JSX.Element {
   const artItemList: ArtItemInterface[] = [
-    { id: 27992, disabled: false },
-    { id: 27998, disabled: false },
-    { id: 27999, disabled: false },
-    { id: 27997, disabled: true },
-    { id: 27993, disabled: false },
+    { id: 27992 },
+    { id: 27998 },
+    { id: 27999 },
+    { id: 27997 },
+    { id: 27993 },
   ];
 
   const [artItems, setArtItems] = useState<ArtItemInterface[]>(artItemList);
 
   return (
-    <div className="App">
-      <h1>Art Rater</h1>
-      {artItems.map(
-        (artItem) => (
-          <ArtItem
-            key={artItem.id}
-            id={artItem.id}
-            disabled={artItem.disabled}
-            setArtItems={setArtItems}
-          />
-        ),
-      )}
-    </div>
+    <QueryClientProvider client={queryClient}>
+      <div className="App">
+        <h1>Art Rater</h1>
+        {artItems.map(
+          (artItem) => (
+            <ArtItem
+              key={artItem.id}
+              id={artItem.id}
+              setArtItems={setArtItems}
+            />
+          ),
+        )}
+        <AddArtItem setArtItems={setArtItems} />
+      </div>
+    </QueryClientProvider>
   );
 }
 

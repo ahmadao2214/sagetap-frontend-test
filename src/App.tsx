@@ -148,14 +148,14 @@ function AddArtItem({ setArtItems }: {
 
   return (
     <div className="add-art-container">
-      {(isError || Number.isInteger(newId)) && <div className="add-art-input">Invalid Id</div>}
       <TextField
         id="outlined-basic"
         label="Enter Id"
         variant="outlined"
         value={newId}
         onChange={(e) => setNewId(e.target.value)}
-        className={isError ? 'add-art-input' : ''}
+        error={isError}
+        helperText={isError && 'Invalid Id'}
       />
       <Button
         variant="contained"

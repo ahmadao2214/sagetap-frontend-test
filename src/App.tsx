@@ -1,12 +1,16 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, {
   Dispatch, SetStateAction, useState,
 } from 'react';
+import Carousel from 'react-material-ui-carousel';
+import { v4 as uuid } from 'uuid';
 import {
   useQuery,
   QueryClient,
   QueryClientProvider,
 } from '@tanstack/react-query';
 import './App.css';
+import { Button, TextField } from '@mui/material';
 
 const queryClient = new QueryClient();
 
@@ -30,9 +34,17 @@ function postArtworkRating(ratedArtItem: RatedArtItemInterface) {
     },
     body: JSON.stringify(ratedArtItem),
   }).then((response) => response.json())
-    .then((data) => console.log('SUCCESS:', data))
+    .then((data) => {
+      console.log('SUCCESS:', data);
+      alert('Sucess');
+    })
     .catch(console.error);
 }
+
+export function useGetArtWork(id: number) {
+  return useQuery(['art', id], () => getArtwork(id));
+}
+
 export interface ArtItemInterface {
   id: number,
 }
@@ -48,26 +60,20 @@ export interface ArtItemComponent extends ArtItemInterface {
 function ArtItem({ id, setArtItems }: ArtItemComponent): JSX.Element {
   const [voted, setVoted] = useState<boolean>(false);
   const [rating, setRating] = useState<number>();
-  const { data } = useQuery(['art', id], () => getArtwork(id));
+  const [submitted, setSubmitted] = useState<boolean>(false);
+  const { data } = useGetArtWork(id);
   const artWorkData = data?.data;
+  const ratings = [1, 2, 3, 4, 5];
 
+  /*
+  clicking submit POSTs update, displays a toast success message, hides buttons
+  Please have the submit button POST to https://20e2q.mocklab.io/rating with the following payload:
+  The endpoint should return the following:
+  {
+    "message": "Success"
+  }
+*/
   const submit = (submittedRating: number) => {
-    /*
-    Please have the submit button POST to https://20e2q.mocklab.io/rating with the following payload:
-
-      {
-        "id": {#id},
-        "rating": {#rating}
-      }
-
-    Where id is the artwork's id, and rating is the selected rating.
-
-    The endpoint should return the following:
-
-    {
-      "message": "Success"
-    }
-  */
     postArtworkRating({ id, rating: submittedRating });
   };
 
@@ -76,65 +82,41 @@ function ArtItem({ id, setArtItems }: ArtItemComponent): JSX.Element {
       <h2>{artWorkData?.title}</h2>
       <h3>{artWorkData?.artist_title}</h3>
       <img
-        style={{ width: 100 }}
+        style={{ width: 550, height: 550, objectFit: 'contain' }}
         alt=""
-        src={getImageUrl(artWorkData?.image_id) ?? ''}
+        src={artWorkData?.image_id && getImageUrl(artWorkData?.image_id)}
       />
       <p>
-        Rating:
-        {' '}
-        {rating ?? ''}
+        {rating ? `Rating: ${rating}` : ''}
       </p>
-      <button
+      {ratings.map((r) => (
+        <Button
+          key={uuid()}
+          variant="outlined"
+          onClick={() => {
+            setRating(r);
+            setVoted(true);
+          }}
+        >
+          {r}
+        </Button>
+      ))}
+      {!submitted && (
+      <Button
+        variant="contained"
+        color="success"
+        disabled={!voted}
         onClick={() => {
-          setRating(1);
-          setVoted(true);
+          setSubmitted(true);
+          submit(rating as number);
         }}
-        type="button"
       >
-        1
-      </button>
-      <button
-        onClick={() => {
-          setRating(2);
-          setVoted(true);
-        }}
-        type="button"
-      >
-        2
-      </button>
-      <button
-        onClick={() => {
-          setRating(3);
-          setVoted(true);
-        }}
-        type="button"
-      >
-        3
-      </button>
-      <button
-        onClick={() => {
-          setRating(4);
-          setVoted(true);
-        }}
-        type="button"
-      >
-        4
-      </button>
-      <button
-        onClick={() => {
-          setRating(5);
-          setVoted(true);
-        }}
-        type="button"
-      >
-        5
-      </button>
-      <button disabled={!voted} onClick={() => submit(rating as number)} type="submit">
         Submit
-      </button>
-      <button
-        type="button"
+      </Button>
+      )}
+      <Button
+        variant="contained"
+        color="error"
         onClick={() => setArtItems(
           (artItems: ArtItemInterface[]) => artItems.filter(
             (art: ArtItemInterface) => art.id !== id,
@@ -142,8 +124,7 @@ function ArtItem({ id, setArtItems }: ArtItemComponent): JSX.Element {
         )}
       >
         Remove Art
-
-      </button>
+      </Button>
     </div>
   );
 }
@@ -153,16 +134,38 @@ function ArtItem({ id, setArtItems }: ArtItemComponent): JSX.Element {
 function AddArtItem({ setArtItems }: {
   setArtItems : Dispatch<SetStateAction<ArtItemInterface[]>>
 }): JSX.Element {
-  const [id, setId] = useState('');
-  const newArtItem: ArtItemInterface = { id: Number(id) };
+  const [newId, setNewId] = useState('');
+  const [isError, setIsError] = useState(false);
 
-  // TODO: Error States - number input, id exists, timeout
+  function addArtItem(id: number) {
+    getArtwork(id).then(
+      (artItem) => {
+        setIsError(false);
+        setArtItems((artItems) => [...artItems, { id: artItem.data.id }]);
+      },
+    ).catch((e) => setIsError(true));
+  }
+
   return (
-    <div>
-      <input type="text" value={id} onChange={(e) => setId(e.target.value)} />
-      <button type="button" onClick={() => setArtItems((artItems: ArtItemInterface[]) => [...artItems, newArtItem])}>
+    <div className="add-art-container">
+      {(isError || Number.isInteger(newId)) && <div className="add-art-input">Invalid Id</div>}
+      <TextField
+        id="outlined-basic"
+        label="Enter Id"
+        variant="outlined"
+        value={newId}
+        onChange={(e) => setNewId(e.target.value)}
+        className={isError ? 'add-art-input' : ''}
+      />
+      <Button
+        variant="contained"
+        onClick={() => {
+          addArtItem(Number(newId));
+          if (!isError) { setNewId(''); }
+        }}
+      >
         Add Art
-      </button>
+      </Button>
     </div>
   );
 }
@@ -182,15 +185,17 @@ function App(): JSX.Element {
     <QueryClientProvider client={queryClient}>
       <div className="App">
         <h1>Art Rater</h1>
-        {artItems.map(
-          (artItem) => (
-            <ArtItem
-              key={artItem.id}
-              id={artItem.id}
-              setArtItems={setArtItems}
-            />
-          ),
-        )}
+        <Carousel autoPlay={false} height={800}>
+          {artItems.map(
+            (artItem) => (
+              <ArtItem
+                key={uuid()}
+                id={artItem.id}
+                setArtItems={setArtItems}
+              />
+            ),
+          )}
+        </Carousel>
         <AddArtItem setArtItems={setArtItems} />
       </div>
     </QueryClientProvider>
